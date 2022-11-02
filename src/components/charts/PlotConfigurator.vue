@@ -43,7 +43,7 @@
         Add new indicator
       </b-button>
       <b-button
-        variant="primary"
+        variant="secondary"
         title="Remove indicator to plot"
         size="sm"
         :disabled="!selIndicatorName"
@@ -64,23 +64,14 @@
     <hr />
 
     <div>
-      <b-button class="ml-1" variant="primary" size="sm" @click="loadPlotConfig">Load</b-button>
-      <b-button class="ml-1" variant="primary" size="sm" @click="loadPlotConfigFromStrategy">
+      <b-button class="ml-1" variant="secondary" size="sm" @click="loadPlotConfig">Load</b-button>
+      <b-button class="ml-1" variant="secondary" size="sm" @click="loadPlotConfigFromStrategy">
         From strategy
       </b-button>
 
       <b-button
         class="ml-1"
-        variant="primary"
-        size="sm"
-        data-toggle="tooltip"
-        title="Save configuration"
-        @click="savePlotConfig"
-        >Save</b-button
-      >
-      <b-button
-        class="ml-1"
-        variant="primary"
+        variant="secondary"
         size="sm"
         title="Load configuration from text box below"
         @click="resetConfig"
@@ -89,7 +80,7 @@
       <b-button
         id="showButton"
         class="ml-1"
-        variant="primary"
+        variant="secondary"
         size="sm"
         title="Show configuration for easy transfer to a strategy"
         @click="showConfig = !showConfig"
@@ -99,11 +90,20 @@
       <b-button
         v-if="showConfig"
         class="ml-1"
-        variant="primary"
+        variant="secondary"
         size="sm"
         title="Load configuration from text box below"
         @click="loadConfigFromString"
         >Load from String</b-button
+      >
+      <b-button
+        class="ml-1"
+        variant="primary"
+        size="sm"
+        data-toggle="tooltip"
+        title="Save configuration"
+        @click="savePlotConfig"
+        >Save</b-button
       >
     </div>
     <div v-if="showConfig" class="col-mb-5 ml-1 mt-2">
@@ -125,20 +125,20 @@ import { getCustomPlotConfig } from '@/shared/storage';
 import PlotIndicator from '@/components/charts/PlotIndicator.vue';
 import { showAlert } from '@/stores/alerts';
 
-import { defineComponent, computed, ref, watch, onMounted } from 'vue';
+import { defineComponent, computed, ref, onMounted } from 'vue';
 import { useBotStore } from '@/stores/ftbotwrapper';
+import { usePlotConfigStore } from '@/stores/plotConfig';
 
 export default defineComponent({
   name: 'PlotConfigurator',
   components: { PlotIndicator },
   props: {
-    value: { type: Object as () => PlotConfig, required: true },
     columns: { required: true, type: Array as () => string[] },
     asModal: { required: false, default: true, type: Boolean },
   },
   emits: ['input'],
-  setup(props, { emit }) {
-    const botStore = useBotStore();
+  setup() {
+    const plotStore = usePlotConfigStore();
 
     const plotConfig = ref<PlotConfig>(EMPTY_PLOTCONFIG);
 
@@ -193,7 +193,7 @@ export default defineComponent({
       plotConfig.value = { ...plotConfig.value };
       // Reset random color
       addNewIndicator.value = false;
-      emit('input', plotConfig.value);
+      plotStore.setPlotConfig(plotConfig.value);
     };
 
     const selIndicator = computed({
@@ -250,7 +250,7 @@ export default defineComponent({
       plotConfig.value = { ...plotConfig.value };
       console.log(plotConfig.value);
       selIndicatorName.value = '';
-      emit('input', plotConfig.value);
+      plotStore.setPlotConfig(plotConfig.value);
     };
     const addSubplot = () => {
       plotConfig.value.subplots = {
@@ -260,27 +260,27 @@ export default defineComponent({
       selSubPlot.value = newSubplotName.value;
       newSubplotName.value = '';
 
-      console.log(plotConfig.value);
-      emit('input', plotConfig.value);
+      plotStore.setPlotConfig(plotConfig.value);
     };
 
     const delSubplot = () => {
       delete plotConfig.value.subplots[selSubPlot.value];
       plotConfig.value.subplots = { ...plotConfig.value.subplots };
       selSubPlot.value = '';
+      plotStore.setPlotConfig(plotConfig.value);
     };
     const loadPlotConfig = () => {
       plotConfig.value = getCustomPlotConfig(plotConfigNameLoc.value);
       console.log(plotConfig.value);
       console.log('loading config');
-      emit('input', plotConfig.value);
+      plotStore.setPlotConfig(plotConfig.value);
     };
 
     const loadConfigFromString = () => {
       // this.plotConfig = JSON.parse();
       if (tempPlotConfig.value !== undefined && tempPlotConfigValid.value) {
         plotConfig.value = tempPlotConfig.value;
-        emit('input', plotConfig.value);
+        plotStore.setPlotConfig(plotConfig.value);
       }
     };
     const resetConfig = () => {
@@ -288,10 +288,11 @@ export default defineComponent({
     };
     const loadPlotConfigFromStrategy = async () => {
       try {
+        const botStore = useBotStore();
         await botStore.activeBot.getStrategyPlotConfig();
         if (botStore.activeBot.strategyPlotConfig) {
           plotConfig.value = botStore.activeBot.strategyPlotConfig;
-          emit('input', plotConfig.value);
+          plotStore.setPlotConfig(plotConfig.value);
         }
       } catch (data) {
         //
@@ -300,23 +301,17 @@ export default defineComponent({
     };
 
     const savePlotConfig = () => {
-      botStore.activeBot.saveCustomPlotConfig({ [plotConfigNameLoc.value]: plotConfig.value });
+      plotStore.saveCustomPlotConfig({ [plotConfigNameLoc.value]: plotConfig.value });
     };
 
-    watch(props.value, () => {
-      console.log('config value');
-      plotConfig.value = props.value;
-      plotConfigNameLoc.value = botStore.activeBot.plotConfigName;
-    });
-
     onMounted(() => {
-      console.log('Config Mounted', props.value);
-      plotConfig.value = props.value;
-      plotConfigNameLoc.value = botStore.activeBot.plotConfigName;
+      // console.log('Config Mounted', props.value);
+      plotConfig.value = plotStore.plotConfig;
+      plotConfigNameLoc.value = plotStore.plotConfigName;
     });
 
     return {
-      botStore,
+      plotStore,
       removeIndicator,
       addSubplot,
       delSubplot,

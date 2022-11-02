@@ -9,7 +9,7 @@
         hide-backdrop
         button-size="sm"
       >
-        <PlotConfigurator v-model="plotConfig" :columns="datasetColumns" />
+        <PlotConfigurator :columns="datasetColumns" />
       </b-modal>
 
       <div class="row mr-0">
@@ -47,10 +47,10 @@
 
           <div class="ml-2">
             <b-select
-              v-model="plotConfigName"
-              :options="botStore.activeBot.availablePlotConfigNames"
+              v-model="plotStore.plotConfigName"
+              :options="plotStore.availablePlotConfigNames"
               size="sm"
-              @change="plotConfigChanged"
+              @change="plotStore.plotConfigChanged"
             >
             </b-select>
           </div>
@@ -67,7 +67,7 @@
           v-if="hasDataset"
           :dataset="dataset"
           :trades="trades"
-          :plot-config="plotConfig"
+          :plot-config="plotStore.plotConfig"
           :heikin-ashi="settingsStore.useHeikinAshiCandles"
           :use-u-t-c="settingsStore.timezone === 'UTC'"
           :theme="settingsStore.chartTheme"
@@ -85,26 +85,19 @@
     </div>
     <transition name="fade" mode="in-out">
       <div v-if="!plotConfigModal" v-show="showPlotConfig" class="w-25 config-sidebar">
-        <PlotConfigurator v-model="plotConfig" :columns="datasetColumns" :as-modal="false" />
+        <PlotConfigurator :columns="datasetColumns" :as-modal="false" />
       </div>
     </transition>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  Trade,
-  PairHistory,
-  EMPTY_PLOTCONFIG,
-  PlotConfig,
-  LoadingStatus,
-  ChartSliderPosition,
-} from '@/types';
+import { Trade, PairHistory, LoadingStatus, ChartSliderPosition } from '@/types';
 import CandleChart from '@/components/charts/CandleChart.vue';
 import PlotConfigurator from '@/components/charts/PlotConfigurator.vue';
-import { getCustomPlotConfig, getPlotConfigName } from '@/shared/storage';
 import vSelect from 'vue-select';
 import { useSettingsStore } from '@/stores/settings';
+import { usePlotConfigStore } from '@/stores/plotConfig';
 
 import { defineComponent, ref, computed, onMounted, watch, getCurrentInstance } from 'vue';
 import { useBotStore } from '@/stores/ftbotwrapper';
@@ -132,10 +125,9 @@ export default defineComponent({
     const root = getCurrentInstance();
     const settingsStore = useSettingsStore();
     const botStore = useBotStore();
+    const plotStore = usePlotConfigStore();
 
     const pair = ref('');
-    const plotConfig = ref<PlotConfig>({ ...EMPTY_PLOTCONFIG });
-    const plotConfigName = ref('');
     const showPlotConfig = ref(props.plotConfigModal);
 
     const dataset = computed((): PairHistory => {
@@ -173,12 +165,6 @@ export default defineComponent({
           return 'Unknown';
       }
     });
-
-    const plotConfigChanged = () => {
-      console.log('plotConfigChanged');
-      plotConfig.value = getCustomPlotConfig(plotConfigName.value);
-      botStore.activeBot.setPlotConfigName(plotConfigName.value);
-    };
 
     const showConfigurator = () => {
       if (props.plotConfigModal) {
@@ -231,8 +217,7 @@ export default defineComponent({
       } else if (props.availablePairs.length > 0) {
         [pair.value] = props.availablePairs;
       }
-      plotConfigName.value = getPlotConfigName();
-      plotConfig.value = getCustomPlotConfig(plotConfigName.value);
+      plotStore.plotConfigChanged();
 
       if (!hasDataset) {
         refresh();
@@ -242,6 +227,7 @@ export default defineComponent({
     return {
       botStore,
       settingsStore,
+      plotStore,
       history,
       dataset,
       strategyName,
@@ -249,13 +235,10 @@ export default defineComponent({
       isLoadingDataset,
       noDatasetText,
       hasDataset,
-      plotConfigChanged,
       showPlotConfig,
       showConfigurator,
       refresh,
-      plotConfigName,
       pair,
-      plotConfig,
     };
   },
 });
